@@ -42,21 +42,30 @@ module Game : Game =
         | B -> "B"
         | Y -> "Y"
         | E -> "." in
-      let rec string_of_row row = 
+      let rec string_of_row col odd row = 
         match row with 
         | [] -> ""
-        | c :: row -> string_of_cell c ^ " " ^ string_of_row row in
-      let rec loop odd board =
+        | c :: row -> string_of_cell c 
+                      ^ (if col = 1 && odd then "\\" else "\\_/") 
+                      ^ string_of_row (col - 1) odd row in
+      let rec loop first odd board =
         match board with
         | [] -> ""
         | row :: board -> 
             (
-              if odd then " "
-              else ""
+              if first then " _/"
+              else if odd then "\\_/"
+              else "/"
             )
-            ^ string_of_row row ^ "\n" ^ loop (not odd) board 
+            ^ string_of_row (List.length row) odd row ^ "\n" ^ loop false (not odd) board in
+      let prelude = List.fold_right (fun _ pre -> pre ^ "_   ") (List.hd board) "   " in
+      let postlude = List.fold_right (fun _ post -> post ^ "\\_/ ") 
+                     (List.hd board) 
+                     (if List.length board mod 2 = 0 then "" else "  ") 
       in
-        loop true board
+        prelude ^ "\n" ^
+        loop true true board ^
+        postlude
   end
 
 let rec fix f x =
