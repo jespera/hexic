@@ -33,8 +33,30 @@ module Game : Game =
 
     let clear_and_score board = (board, 0)
     let drop_cells board = board
+    (* simple version of printing first *)
     let string_of_board board = 
-      let 
+      let string_of_cell cell = 
+        match cell with
+        | R -> "R"
+        | G -> "G"
+        | B -> "B"
+        | Y -> "Y"
+        | E -> "." in
+      let rec string_of_row row = 
+        match row with 
+        | [] -> ""
+        | c :: row -> string_of_cell c ^ " " ^ string_of_row row in
+      let rec loop odd board =
+        match board with
+        | [] -> ""
+        | row :: board -> 
+            (
+              if odd then " "
+              else ""
+            )
+            ^ string_of_row row ^ "\n" ^ loop (not odd) board 
+      in
+        loop true board
   end
 
 let rec fix f x =
