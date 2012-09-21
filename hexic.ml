@@ -14,13 +14,21 @@ module Game =
 
     type cluster = board_coord list
 
-    let cluster_eq cl1 cl2 = 
+    let coord_eq (a,b,c) (d,e,f) =
+      let cl1 = [a;b;c] in
+      let cl2 = [d;e;f] in 
       List.for_all (fun x -> List.mem x cl2) cl1 &&
       List.for_all (fun x -> List.mem x cl1) cl2
 
     let row_width = 5
     let num_rows = 17
     (* 5 * 17 = 85 cells *)
+    
+    let coords_of_board board =
+      List.concat (
+        List.mapi (fun y row -> List.mapi (fun x value -> (x,y)) row) board
+      )
+
 
     (* TODO *)
     let init_board seed = 
@@ -34,13 +42,43 @@ module Game =
       ]
       end
 
+    let validate_pos board (x, y) = 
+      let cols = List.length (List.hd board)
+      and rows = List.length board in
+      if y >= 0 && x >= 0
+         && x < cols && y < rows
+      then Some (x, y)
+      else None
+
+    let get_sw board (x, y) = if y mod 2 = 0 
+                        then validate_pos board (x, y + 1)
+                        else validate_pos board (x - 1, y + 1)
+    let get_s  board (x, y) = validate_pos board (x, y + 2)
+    let get_se board (x, y) = if y mod 2 = 0
+                        then validate_pos board (x, y + 1)
+                        else validate_pos board (x + 1, y + 1)
+
     (* TODO *)
     let get_rotatable_positions board = 
       (* based on length and heigth of board, systematically construct all
        * rotatable positions
        *)
-      [((0,1),(0,0),(0,2))
-      ]
+      let add_position acc_positions (coord, adj_s, adj_diag) =
+        match adj_s, adj_diag with
+        | None, _ 
+        | _, None -> acc_positions
+        | Some coord_s, Some coord_d ->
+            let pos = (coord, coord_s, coord_d) in
+            if List.exists (coord_eq pos) acc_positions
+            then acc_positions
+            else pos :: acc_positions in
+      List.fold_left (fun acc_positions coord -> 
+        let sw = get_sw board coord
+        and s  = get_s board coord
+        and se = get_se board coord in
+        add_position (add_position acc_positions (coord, s, sw))
+                     (coord, s, se)
+      ) [] (coords_of_board board)
 
     let rec set_row row x value =
       match row with
@@ -81,11 +119,6 @@ module Game =
                                       coord1 val2)
                            coord2 val3)
                 coord3 val1
-
-    let coords_of_board board =
-      List.concat (
-        List.mapi (fun y row -> List.mapi (fun x value -> (x,y)) row) board
-      )
 
     let swap_values board pos1 pos2 =
       let val1 = get_board board pos1 
@@ -283,8 +316,6 @@ let hexic_step (board, score) =
    * would give the most points in return, when a move does not change the score
    * the game ends
    *)
-  let _ = print_endline "step" in
-  let _ = print_endline (Game.string_of_board board) in
   let positions = Game.get_rotatable_positions board in
   let best_greedy_move = 
     List.fold_left (fun (board, score) position -> 
@@ -296,12 +327,8 @@ let hexic_step (board, score) =
     (board, score) positions 
   in
     fix (fun (board, score) ->
-      let _ = print_endline "dropped" in
       let dropped_board = Game.drop_cells board in
-      let _ = print_endline (Game.string_of_board dropped_board) in
       let (new_board, new_score) = Game.clear_and_score dropped_board in
-      let _ = print_endline "cleared" in
-      let _ = print_endline (Game.string_of_board new_board) in
       if new_score = 0 then (board, score)
       else (Game.drop_cells new_board, score + new_score)
     ) best_greedy_move
