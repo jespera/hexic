@@ -51,6 +51,5 @@ Notice that a cluster of 4 (or more) might be formed:
 2) like 1) but in a formation where each cell has at least two adjacent
    same-valued cells
 
-=> My guess is: "maximum number of same-valued cells adjacent to each other".
-Thus, a cluster could theoretically be a long vertical line on the board or
-even a "slanted" line across several rows and columns of a board
+=> It seems the common interpretation is 2) from the games available to play
+(web + android)
