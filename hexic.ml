@@ -27,10 +27,10 @@ module Game =
       (* randomly generate board from given seed *)
       begin
         Random.init seed;
-      [ [G;R;G];
-       [G;G;R];
-        [R;R;R];
-       [G;G;G]
+      [ [B;R;B];
+       [G;G;G];
+        [R;R;G];
+       [B;B;G]
       ]
       end
 
@@ -82,7 +82,7 @@ module Game =
                            coord2 val3)
                 coord3 val1
 
-    let positions_of_board board =
+    let coords_of_board board =
       List.concat (
         List.mapi (fun y row -> List.mapi (fun x value -> (x,y)) row) board
       )
@@ -99,35 +99,40 @@ module Game =
     let is_on_top (x1, y1) (x2, y2) = 
       x1 = x2 && (y1 + 2 = y2 || y1 = y2 + 2)
 
-    let is_sw (x1, y1) (x2, y2) = 
-      (y1 + 1 = y2 || y1 = y2 + 1) 
-      && x1 = x2
-
-    let is_se (x1, y1) (x2, y2) = 
-      (y1 + 1 = y2 && x1 + 1 = x2) || 
-      (y1 = y2 + 1 && x1 = x2 + 1)
+    (* check whether two positions are adjacent diagonally *)
+    let is_diag (x1, y1) (x2, y2) = 
+      let local_diag (x1, y1) (x2, y2) =
+        if y1 mod 2 = 0
+        then x1 = x2 && y1 + 1 = y2 || x1 + 1 = x2 && y1 + 1 = y2
+        else x1 - 1 = x2 && y1 + 1 = y2 || x1 = x2 && y1 + 1 = y2 in
+      if y1 = y2 then false
+      else 
+         local_diag (x1, y1) (x2, y2)
+      || local_diag (x2, y2) (x1, y1)
+      
+    let string_of_coord (x, y) = "("^string_of_int x^","^string_of_int y^")"
 
     let collect_clusters board =
       let adjacent_eq_pos pos1 pos2 = 
         get_board board pos1 = get_board board pos2 
         && is_filled board pos1
         && ( is_on_top pos1 pos2 
-          || is_sw pos1 pos2 
-          || is_se pos1 pos2) in
+          || is_diag pos1 pos2 
+           ) in
       let is_relevant pos cluster =
         List.exists (adjacent_eq_pos pos) cluster in
-      let add_pos clusters pos = 
+      let add_coord clusters pos = 
         let (to_merge_clusters, others) = 
           List.partition (is_relevant pos) clusters 
         in
           if to_merge_clusters = []
           then [pos] :: others
           else (pos :: List.concat to_merge_clusters) :: others in
-      let all_positions = positions_of_board board 
+      let all_positions = coords_of_board board 
       in
         List.filter 
           (fun cluster -> List.length cluster >= 3)
-          (List.fold_left add_pos [] all_positions)
+          (List.fold_left add_coord [] all_positions)
 
     let rec three_pow n = if n = 1 then 3 else 3 * three_pow (n - 1)
 
@@ -218,8 +223,6 @@ module Game =
         board (get_column_idxs board)
      
 
-    let drop_cells board = fill_board (pull_down_cells board)
-
     (* simple version of printing first *)
     let string_of_board board = 
       let string_of_cell cell = 
@@ -253,6 +256,10 @@ module Game =
         prelude ^ "\n" ^
         loop true true board ^
         postlude
+    
+    let drop_cells board =
+      fill_board (pull_down_cells board)
+
   end
 
 let rec fix f x =
@@ -289,8 +296,12 @@ let hexic_step (board, score) =
     (board, score) positions 
   in
     fix (fun (board, score) ->
+      let _ = print_endline "dropped" in
       let dropped_board = Game.drop_cells board in
+      let _ = print_endline (Game.string_of_board dropped_board) in
       let (new_board, new_score) = Game.clear_and_score dropped_board in
+      let _ = print_endline "cleared" in
+      let _ = print_endline (Game.string_of_board new_board) in
       if new_score = 0 then (board, score)
       else (Game.drop_cells new_board, score + new_score)
     ) best_greedy_move
