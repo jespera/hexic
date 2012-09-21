@@ -87,6 +87,14 @@ module Game =
         List.mapi (fun y row -> List.mapi (fun x value -> (x,y)) row) board
       )
 
+    let swap_values board pos1 pos2 =
+      let val1 = get_board board pos1 
+      and val2 = get_board board pos2 in
+      set_board (set_board board pos1 val2) pos2 val1
+
+    let is_empty board pos = get_board board pos = E 
+    let is_filled board pos = not(is_empty board pos)
+
 
     let is_on_top (x1, y1) (x2, y2) = 
       x1 = x2 && (y1 + 2 = y2 || y1 = y2 + 2)
@@ -102,6 +110,7 @@ module Game =
     let collect_clusters board =
       let adjacent_eq_pos pos1 pos2 = 
         get_board board pos1 = get_board board pos2 
+        && is_filled board pos1
         && ( is_on_top pos1 pos2 
           || is_sw pos1 pos2 
           || is_se pos1 pos2) in
@@ -186,14 +195,6 @@ module Game =
       in
         loop row_idxs
 
-    let swap_values board pos1 pos2 =
-      let val1 = get_board board pos1 
-      and val2 = get_board board pos2 in
-      set_board (set_board board pos1 val2) pos2 val1
-
-    let is_empty board pos = get_board board pos = E 
-    let is_filled board pos = not(is_empty board pos)
-
     let pull_down_odd_even_colums board col_idx =
       let rec loop acc_board row_idxs = match row_idxs with
           | [] -> acc_board
@@ -275,6 +276,8 @@ let hexic_step (board, score) =
    * would give the most points in return, when a move does not change the score
    * the game ends
    *)
+  let _ = print_endline "step" in
+  let _ = print_endline (Game.string_of_board board) in
   let positions = Game.get_rotatable_positions board in
   let best_greedy_move = 
     List.fold_left (fun (board, score) position -> 
@@ -285,8 +288,9 @@ let hexic_step (board, score) =
     ) 
     (board, score) positions 
   in
-    fix (fun (board, score) -> 
-      let (new_board, new_score) = Game.clear_and_score board in
+    fix (fun (board, score) ->
+      let dropped_board = Game.drop_cells board in
+      let (new_board, new_score) = Game.clear_and_score dropped_board in
       if new_score = 0 then (board, score)
       else (Game.drop_cells new_board, score + new_score)
     ) best_greedy_move
@@ -297,6 +301,9 @@ let hexic_step (board, score) =
 let main () = 
   ite_trace hexic_step (Game.init_board 0, 0)
 
-(*
- * let _ = main()
- *)
+
+let _ = 
+  List.iter (fun (board, score) -> 
+    print_endline (string_of_int score ^ "\n" 
+                   ^ Game.string_of_board board ^ "\n")
+  ) ((Game.init_board 0, 0) :: (List.rev (main())))
