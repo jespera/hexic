@@ -207,8 +207,8 @@ module Game =
                        loop new_board row_idxs
               else loop acc_board row_idxs
       in
-        loop (loop board (get_even_row_idxs board))
-             (get_odd_row_idxs board)
+        loop (loop board (List.rev (get_even_row_idxs board)))
+             (List.rev (get_odd_row_idxs board))
 
 
     (* make cells fall as far down as possible, not filling in new cells *)
