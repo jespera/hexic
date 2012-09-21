@@ -25,11 +25,14 @@ module Game =
     (* TODO *)
     let init_board seed = 
       (* randomly generate board from given seed *)
-      [ [G;R;R];
+      begin
+        Random.init seed;
+      [ [G;R;G];
        [G;G;R];
         [R;R;R];
        [G;G;G]
       ]
+      end
 
     (* TODO *)
     let get_rotatable_positions board = 
@@ -140,8 +143,81 @@ module Game =
       )
 
 
-    (* TODO *)
-    let drop_cells board = board
+    let cell_of_int i = match i with
+      | 0 -> R
+      | 1 -> G
+      | 2 -> B
+      | 3 -> Y
+      | _ -> failwith ("'cell_of_int' unhandled input " ^ string_of_int i)
+
+    let get_random_cell_value () = cell_of_int (Random.int 3)
+
+    let fill_board board = 
+      List.map (fun row -> List.map 
+                           (fun e -> if e = E 
+                                     then get_random_cell_value() 
+                                     else e
+                           ) 
+                           row) 
+               board
+
+    let to_n inc start n = 
+      let rec loop x =
+        if x >= n then []
+        else x :: loop (inc x)
+      in
+        loop start
+
+    let get_column_idxs board = to_n (fun x -> x + 1) 0 (List.length (List.hd board))
+
+    let get_odd_row_idxs board =
+        to_n (fun x -> x + 2) 1 (List.length board)
+
+    let get_even_row_idxs board =
+        to_n (fun x -> x + 2) 0 (List.length board)
+
+    let scan_col f board col_idx row_idxs =
+      let rec loop row_idxs =
+        match row_idxs with
+        | [] -> None
+        | row_idx :: row_idxs -> if f board (col_idx, row_idx)
+                                 then Some (col_idx, row_idx)
+                                 else loop row_idxs
+      in
+        loop row_idxs
+
+    let swap_values board pos1 pos2 =
+      let val1 = get_board board pos1 
+      and val2 = get_board board pos2 in
+      set_board (set_board board pos1 val2) pos2 val1
+
+    let is_empty board pos = get_board board pos = E 
+    let is_filled board pos = not(is_empty board pos)
+
+    let pull_down_odd_even_colums board col_idx =
+      let rec loop acc_board row_idxs = match row_idxs with
+          | [] -> acc_board
+          | row_idx :: row_idxs -> 
+              if is_empty acc_board (col_idx, row_idx)
+              then match scan_col is_filled acc_board col_idx row_idxs with
+                   | None -> acc_board
+                   | Some pos -> 
+                       let new_board = swap_values acc_board (col_idx, row_idx) pos in
+                       loop new_board row_idxs
+              else loop acc_board row_idxs
+      in
+        loop (loop board (get_even_row_idxs board))
+             (get_odd_row_idxs board)
+
+
+    (* make cells fall as far down as possible, not filling in new cells *)
+    let pull_down_cells board = 
+      List.fold_left 
+        pull_down_odd_even_colums
+        board (get_column_idxs board)
+     
+
+    let drop_cells board = fill_board (pull_down_cells board)
 
     (* simple version of printing first *)
     let string_of_board board = 
