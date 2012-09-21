@@ -25,8 +25,8 @@ module Game =
     (* TODO *)
     let init_board seed = 
       (* randomly generate board from given seed *)
-      [ [R;R;R];
-       [G;G;G];
+      [ [G;R;R];
+       [G;G;R];
         [R;R;R];
        [G;G;G]
       ]
@@ -79,8 +79,43 @@ module Game =
                            coord2 val3)
                 coord3 val1
 
-    (* TODO *)
-    let collect_clusters board = [[]] 
+    let positions_of_board board =
+      List.concat (
+        List.mapi (fun y row -> List.mapi (fun x value -> (x,y)) row) board
+      )
+
+
+    let is_on_top (x1, y1) (x2, y2) = 
+      x1 = x2 && (y1 + 2 = y2 || y1 = y2 + 2)
+
+    let is_sw (x1, y1) (x2, y2) = 
+      (y1 + 1 = y2 || y1 = y2 + 1) 
+      && x1 = x2
+
+    let is_se (x1, y1) (x2, y2) = 
+      (y1 + 1 = y2 && x1 + 1 = x2) || 
+      (y1 = y2 + 1 && x1 = x2 + 1)
+
+    let collect_clusters board =
+      let adjacent_eq_pos pos1 pos2 = 
+        get_board board pos1 = get_board board pos2 
+        && ( is_on_top pos1 pos2 
+          || is_sw pos1 pos2 
+          || is_se pos1 pos2) in
+      let is_relevant pos cluster =
+        List.exists (adjacent_eq_pos pos) cluster in
+      let add_pos clusters pos = 
+        let (to_merge_clusters, others) = 
+          List.partition (is_relevant pos) clusters 
+        in
+          if to_merge_clusters = []
+          then [pos] :: others
+          else (pos :: List.concat to_merge_clusters) :: others in
+      let all_positions = positions_of_board board 
+      in
+        List.filter 
+          (fun cluster -> List.length cluster >= 3)
+          (List.fold_left add_pos [] all_positions)
 
     let rec three_pow n = if n = 1 then 3 else 3 * three_pow (n - 1)
 
