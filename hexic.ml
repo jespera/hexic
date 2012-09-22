@@ -406,19 +406,25 @@ let hexic_step (board, score) =
    *)
   let positions = Game.get_rotatable_positions board in
   let best_greedy_move = 
-    List.fold_left (fun (board, score) position -> 
+    List.fold_left (fun (old_board, old_score) position -> 
       let rot_board = Game.rotate board position in
       let (clr_board, new_score) = Game.clear_and_score rot_board in
-      if new_score + score > score then (clr_board, new_score + score)
-      else (board, score)
+      if new_score + score > old_score 
+      then 
+        (clr_board, new_score + score)
+      else (old_board, old_score)
     ) 
     (board, score) positions 
   in
-    let eq_f (board1, score1) (board2, score2) = score1 = score2 in
-    fix eq_f (fun (board, score) ->
+    (*let _ = print_endline ("best rotation => " ^ string_of_int (snd best_greedy_move - score)) in*)
+    fix (=) (fun (board, score) ->
       let dropped_board = Game.drop_cells board in
+      (*let _ = print_endline "dropping" in*)
+      (*let _ = print_endline (Game.string_of_board dropped_board) in*)
       let (new_board, new_score) = Game.clear_and_score dropped_board in
-      if new_score = 0 then (board, score)
+      (*let _ = print_endline ("cleared = " ^ string_of_int new_score)in*)
+      (*let _ = print_endline (Game.string_of_board new_board) in*)
+      if new_score = 0 then (dropped_board, score)
       else (Game.drop_cells new_board, score + new_score)
     ) best_greedy_move
   
@@ -431,6 +437,7 @@ let main () =
   let _ = print_endline (Game.string_of_board init_board) in
   let _ = print_newline () in
   let trace = ite_trace (fun (board, score) -> 
+                          print_endline "=====";
                           print_endline (string_of_int score ^ "\n" 
                                          ^ Game.string_of_board board ^ "\n")
 
