@@ -29,18 +29,23 @@ module Game =
         List.mapi (fun y row -> List.mapi (fun x value -> (x,y)) row) board
       )
 
+    let cell_of_int i = match i with
+      | 0 -> R
+      | 1 -> G
+      | 2 -> B
+      | 3 -> Y
+      | _ -> failwith ("'cell_of_int' unhandled input " ^ string_of_int i)
 
-    (* TODO *)
-    let init_board seed = 
-      (* randomly generate board from given seed *)
-      begin
-        Random.init seed;
-      [ [B;R;B];
-       [G;G;G];
-        [R;R;G];
-       [B;B;G]
-      ]
-      end
+    let get_random_cell_value () = cell_of_int (Random.int 3)
+
+    let to_n inc start n = 
+      let rec loop x =
+        if x >= n then []
+        else x :: loop (inc x)
+      in
+        loop start
+
+    let upto_n n = to_n (fun x -> x + 1) 0 n
 
     let validate_pos board (x, y) = 
       let cols = List.length (List.hd board)
@@ -55,8 +60,17 @@ module Game =
                         else validate_pos board (x - 1, y + 1)
     let get_s  board (x, y) = validate_pos board (x, y + 2)
     let get_se board (x, y) = if y mod 2 = 0
-                        then validate_pos board (x, y + 1)
-                        else validate_pos board (x + 1, y + 1)
+                        then validate_pos board (x + 1, y + 1)
+                        else validate_pos board (x, y + 1)
+
+    let get_nw board (x, y) =  if y mod 2 = 0 
+                        then validate_pos board (x, y - 1)
+                        else validate_pos board (x - 1, y - 1)
+    let get_n  board (x, y) = validate_pos board (x, y - 2)
+    let get_ne board (x, y) = if y mod 2 = 0
+                        then validate_pos board (x + 1, y - 1)
+                        else validate_pos board (x, y - 1)
+
 
     (* TODO *)
     let get_rotatable_positions board = 
@@ -144,30 +158,99 @@ module Game =
       || local_diag (x2, y2) (x1, y1)
       
     let string_of_coord (x, y) = "("^string_of_int x^","^string_of_int y^")"
+   
+    let filter_opt f ls = List.fold_right (fun elm acc -> match elm with 
+                                               | None -> acc
+                                               | Some e -> if f e then e :: acc else acc
+                                          ) ls []
+
+
+    (* TODO *)
+    let has_two_adjacent board y cluster =
+      let find dir_f = match dir_f board y with
+        | None -> None
+        | Some coord -> if List.mem coord cluster then Some coord else None in
+      let nwn  = (find get_nw, find get_n )
+      and nne  = (find get_n , find get_ne)
+      and nese = (find get_ne, find get_se)
+      and ses  = (find get_se, find get_s )
+      and ssw  = (find get_s , find get_sw)
+      and swnw = (find get_sw, find get_nw) in
+      List.exists (fun (r1, r2) -> match r1, r2 with
+                    | None, _ | _, None -> 
+                        false
+                    | Some c1, Some c2 -> 
+                        let val1 = get_board board c1
+                        and val2 = get_board board c2 
+                        and valy = get_board board y in
+                        val1 = val2 && val1 = valy && valy != E
+                  ) [nwn; nne; nese; ses; ssw; swnw]
+
+    let is_cluster board cluster =
+      match cluster with
+      | _ when List.length cluster < 3 -> false
+      | x :: xs ->
+          let valx = get_board board x in
+          not(valx = E) &&
+          List.for_all (fun y -> 
+            get_board board y = valx &&
+            has_two_adjacent board y cluster
+          ) (x :: xs)
+      | _ -> false
+
+
+    let get_eq_adjacent board cluster = 
+      List.fold_left (fun acc_new coord ->
+        let col= get_board board coord
+        and nw = get_nw board coord
+        and n  = get_n  board coord
+        and ne = get_ne board coord
+        and sw = get_sw board coord
+        and s  = get_s  board coord
+        and se = get_se board coord in
+        let pre_filtered = filter_opt (fun adj_coord ->
+                                              get_board board adj_coord = col &&
+                                              not(List.mem adj_coord cluster) &&
+                                              not(List.mem adj_coord acc_new)
+                                       ) [nw;n;ne;sw;s;se] in
+        let pre_cluster = pre_filtered @ cluster in
+        List.filter 
+          (fun adj_coord -> has_two_adjacent board adj_coord pre_cluster) 
+          pre_filtered
+        @ acc_new
+      ) [] cluster 
+
+    let get_initial_cluster board (x, y) = (x,y) :: get_eq_adjacent board [(x,y)] 
+
 
     let collect_clusters board =
-      let adjacent_eq_pos pos1 pos2 = 
-        get_board board pos1 = get_board board pos2 
-        && is_filled board pos1
-        && ( is_on_top pos1 pos2 
-          || is_diag pos1 pos2 
-           ) in
-      let is_relevant pos cluster =
-        List.exists (adjacent_eq_pos pos) cluster in
-      let add_coord clusters pos = 
-        let (to_merge_clusters, others) = 
-          List.partition (is_relevant pos) clusters 
+      let rec grow_cluster (x, y) =
+        let initial_cluster = get_initial_cluster board (x, y) in
+        let rec grow cluster =
+          let eq_adjacent = get_eq_adjacent board cluster in
+          if eq_adjacent = [] then cluster
+          else grow (eq_adjacent @ cluster)
         in
-          if to_merge_clusters = []
-          then [pos] :: others
-          else (pos :: List.concat to_merge_clusters) :: others in
-      let all_positions = coords_of_board board 
+          grow initial_cluster
       in
-        List.filter 
-          (fun cluster -> List.length cluster >= 3)
-          (List.fold_left add_coord [] all_positions)
-
-    let rec three_pow n = if n = 1 then 3 else 3 * three_pow (n - 1)
+      List.fold_left 
+            (fun acc_clusters coord -> 
+              if List.exists (List.mem coord) acc_clusters then acc_clusters
+              else 
+                let cluster = grow_cluster coord in
+                if is_cluster board cluster 
+                then cluster :: acc_clusters
+                else acc_clusters
+            )
+            [] (coords_of_board board)
+           
+    let three_pow n =
+      let rec loop acc n =
+        if n < 1 then 1 else 
+        if n = 1 then acc*3 
+        else loop (acc * 3) (n - 1)
+      in
+        loop 1 n
 
     let score_cluster cluster =
      (* a cluster of size 3 being cleared provides 3 points, while a cluster of
@@ -189,16 +272,6 @@ module Game =
       ,List.fold_left (+) 0 (List.map score_cluster clusters)
       )
 
-
-    let cell_of_int i = match i with
-      | 0 -> R
-      | 1 -> G
-      | 2 -> B
-      | 3 -> Y
-      | _ -> failwith ("'cell_of_int' unhandled input " ^ string_of_int i)
-
-    let get_random_cell_value () = cell_of_int (Random.int 3)
-
     let fill_board board = 
       List.map (fun row -> List.map 
                            (fun e -> if e = E 
@@ -207,13 +280,6 @@ module Game =
                            ) 
                            row) 
                board
-
-    let to_n inc start n = 
-      let rec loop x =
-        if x >= n then []
-        else x :: loop (inc x)
-      in
-        loop start
 
     let get_column_idxs board = to_n (fun x -> x + 1) 0 (List.length (List.hd board))
 
@@ -293,21 +359,43 @@ module Game =
     let drop_cells board =
       fill_board (pull_down_cells board)
 
+
+    let gen_random_board seed = 
+      let rec gen_row num = 
+        if num = 0 then []
+        else get_random_cell_value () :: gen_row (num - 1) in
+      let rec gen_rows num = 
+        if num = 0 then []
+        else gen_row row_width :: gen_rows (num - 1) in
+      begin
+        Random.init seed;
+        gen_rows num_rows 
+      end
+
+    let init_board seed =
+      let rec loop board =
+        let clt_board, _ = clear_and_score board in
+        if clt_board = board
+        then board
+        else loop (drop_cells clt_board) in
+      loop (gen_random_board seed)
   end
 
-let rec fix f x =
+let rec fix eq_f f x =
   let new_x = f x in
-  if new_x = x then x
-  else fix f new_x
+  if eq_f new_x x then x
+  else fix eq_f f new_x
 
   (* trace the iteration of application of function f;
    * trace starts with last value computed and ends in the initial value given
    *)
-let ite_trace f init =
+let ite_trace printf f init =
   let rec loop trace x =
     let new_x = f x in
     if x = new_x then trace
-    else loop (new_x :: trace) new_x
+    else 
+      let _ = printf new_x in
+      loop (new_x :: trace) new_x
   in
     loop [] init
 
@@ -326,7 +414,8 @@ let hexic_step (board, score) =
     ) 
     (board, score) positions 
   in
-    fix (fun (board, score) ->
+    let eq_f (board1, score1) (board2, score2) = score1 = score2 in
+    fix eq_f (fun (board, score) ->
       let dropped_board = Game.drop_cells board in
       let (new_board, new_score) = Game.clear_and_score dropped_board in
       if new_score = 0 then (board, score)
@@ -337,11 +426,19 @@ let hexic_step (board, score) =
 
 
 let main () = 
-  ite_trace hexic_step (Game.init_board 0, 0)
+  let init_board = Game.init_board 0 in
+  let _ = print_endline "Init board" in
+  let _ = print_endline (Game.string_of_board init_board) in
+  let _ = print_newline () in
+  let trace = ite_trace (fun (board, score) -> 
+                          print_endline (string_of_int score ^ "\n" 
+                                         ^ Game.string_of_board board ^ "\n")
 
+                        ) 
+                        hexic_step (init_board, 0)
+  in
+    trace
 
 let _ = 
-  List.iter (fun (board, score) -> 
-    print_endline (string_of_int score ^ "\n" 
-                   ^ Game.string_of_board board ^ "\n")
-  ) ((Game.init_board 0, 0) :: (List.rev (main())))
+  let _ = main () in
+  print_endline "done"
