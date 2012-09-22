@@ -368,7 +368,7 @@ module Game =
         if num = 0 then []
         else gen_row row_width :: gen_rows (num - 1) in
       begin
-        Random.init seed;
+        Random.self_init ();
         gen_rows num_rows 
       end
 
