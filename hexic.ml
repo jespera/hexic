@@ -72,7 +72,6 @@ module Game =
                         else validate_pos board (x, y - 1)
 
 
-    (* TODO *)
     let get_rotatable_positions board = 
       (* based on length and heigth of board, systematically construct all
        * rotatable positions
@@ -142,21 +141,6 @@ module Game =
     let is_empty board pos = get_board board pos = E 
     let is_filled board pos = not(is_empty board pos)
 
-
-    let is_on_top (x1, y1) (x2, y2) = 
-      x1 = x2 && (y1 + 2 = y2 || y1 = y2 + 2)
-
-    (* check whether two positions are adjacent diagonally *)
-    let is_diag (x1, y1) (x2, y2) = 
-      let local_diag (x1, y1) (x2, y2) =
-        if y1 mod 2 = 0
-        then x1 = x2 && y1 + 1 = y2 || x1 + 1 = x2 && y1 + 1 = y2
-        else x1 - 1 = x2 && y1 + 1 = y2 || x1 = x2 && y1 + 1 = y2 in
-      if y1 = y2 then false
-      else 
-         local_diag (x1, y1) (x2, y2)
-      || local_diag (x2, y2) (x1, y1)
-      
     let string_of_coord (x, y) = "("^string_of_int x^","^string_of_int y^")"
    
     let filter_opt f ls = List.fold_right (fun elm acc -> match elm with 
@@ -165,7 +149,6 @@ module Game =
                                           ) ls []
 
 
-    (* TODO *)
     let has_two_adjacent board y cluster =
       let find dir_f = match dir_f board y with
         | None -> None
